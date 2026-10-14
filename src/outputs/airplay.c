@@ -1524,6 +1524,7 @@ session_cipher_setup(struct airplay_session *session, const uint8_t *key, size_t
 static int
 session_ids_set(struct airplay_session *session)
 {
+  struct airplay_session *s;
   char *address = NULL;
   char *intf;
   char ifname[64];
@@ -1570,7 +1571,18 @@ session_ids_set(struct airplay_session *session)
 
   // Session UUID, ID and session URL
   uuid_make(session->session_uuid);
-  uuid_make(session->group_uuid);
+  // Sessions running at the same time are one group, like the speakers of an
+  // Apple sender's multiroom playback
+  for (s = airplay_sessions; s; s = s->next)
+    {
+      if (s != session && s->group_uuid[0] && s->state != AIRPLAY_STATE_TEARDOWN && !(s->state & AIRPLAY_STATE_F_FAILED))
+	break;
+    }
+
+  if (s)
+    memcpy(session->group_uuid, s->group_uuid, sizeof(session->group_uuid));
+  else
+    uuid_make(session->group_uuid);
 
   gcry_randomize(&session->session_id, sizeof(session->session_id), GCRY_STRONG_RANDOM);
 
